@@ -3,6 +3,10 @@ import fetch from "node-fetch";
 
 const app = express();
 
+app.get('/', (req, res) => {
+  res.send('OK');
+});
+
 app.get("/oauth/discord/callback", async (req, res) => {
   const code = req.query.code;
   const params = new URLSearchParams({
