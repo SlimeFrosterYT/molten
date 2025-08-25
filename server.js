@@ -2,7 +2,6 @@ import express from 'express';
 
 const app = express();
 
-// Discord OAuth callback route
 app.get('/oauth/discord/callback', async (req, res) => {
   try {
     const code = req.query.code;
@@ -16,7 +15,6 @@ app.get('/oauth/discord/callback', async (req, res) => {
       redirect_uri: 'https://molten-f0o7.onrender.com/oauth/discord/callback'
     });
 
-    // Get access token
     const tokenRes = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       body: params,
@@ -27,7 +25,6 @@ app.get('/oauth/discord/callback', async (req, res) => {
 
     const data = await tokenRes.json();
 
-    // Get user info
     const userRes = await fetch('https://discord.com/api/v10/users/@me', {
       headers: { Authorization: `Bearer ${data.access_token}` }
     });
@@ -36,7 +33,6 @@ app.get('/oauth/discord/callback', async (req, res) => {
 
     const user = await userRes.json();
 
-    // Send minimal info to client
     res.json({
       username: user.username,
       avatar: user.avatar,
@@ -48,6 +44,5 @@ app.get('/oauth/discord/callback', async (req, res) => {
   }
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
