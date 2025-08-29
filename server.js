@@ -1,32 +1,16 @@
-import express from "express";
-import fetch from "node-fetch";
-import session from "express-session";
+const express = require("express");
+const fetch = require("node-fetch");
 
 const app = express();
 
-// Discord OAuth
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = "https://molten-f0o7.onrender.com/oauth/discord/callback";
-
-// Allowed users
-const allowedUsers = [
-  "slimefroster#0"
-];
-
-// Use session to store Discord user data securely
-app.use(session({
-  secret: process.env.SESSION_SECRET || "supersecret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === "production" } // HTTPS only in prod
-}));
 
 app.get("/", (req, res) => {
   res.send("Server running");
 });
 
-// Discord OAuth callback
 app.get("/oauth/discord/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("Missing code");
@@ -54,39 +38,29 @@ app.get("/oauth/discord/callback", async (req, res) => {
     });
     const user = await userRes.json();
 
-    // Fix avatar URL
     const avatarUrl = user.avatar
       ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
       : "https://i.ibb.co/wZpCg9HX/default-avatar-profile-icon-social-600nw-1677509740-removebg-preview-2.png";
 
-    // Store user in session
-    req.session.discordUser = {
+    const payload = {
       id: user.id,
       username: user.username,
       discriminator: user.discriminator,
       avatar: avatarUrl,
-      allowed: allowedUsers.includes(`${user.username}#${user.discriminator}`)
     };
 
-    res.redirect("/game"); // redirect to your game page
+    const randomKey =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+
+    res.redirect(
+      `/game?${randomKey}=${encodeURIComponent(JSON.stringify(payload))}`
+    );
   } catch (err) {
     console.error(err);
     res.send("An error occurred");
   }
-});
-
-// Endpoint for client to get user info
-app.get("/api/user", (req, res) => {
-  if (!req.session.discordUser) return res.status(401).json({ error: "Not logged in" });
-  res.json(req.session.discordUser);
-});
-
-// Logout
-app.get("/logout", (req, res) => {
-  req.session.destroy(err => {
-    if (err) return res.send("Failed to log out");
-    res.redirect("/"); // or wherever you want
-  });
 });
 
 app.listen(process.env.PORT || 3000, () => console.log("Server running"));
