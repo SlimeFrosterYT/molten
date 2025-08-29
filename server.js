@@ -1,72 +1,95 @@
 import express from "express";
 import fetch from "node-fetch";
-import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 const app = express();
 
-// ===== CONFIG =====
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = "https://yourdomain.com/oauth/discord/callback";
-const BOT_TOKEN = process.env.BOT_TOKEN; // use your bot token here
+// Replace with your Discord server & role IDs
 const SERVER_ID = "1380225771603366058";
 const ROLE_ID = "1380829476228956260";
-const JWT_SECRET = "aR@nDoM$eCuReS3cret!123"; // use strong secret in env
+const SECRET = "aR@nDoM$eCuReS3cret!123"; // Your secure JWT secret
 
-// ===== ROUTES =====
-app.get("/", (req, res) => {
-  res.send("OK");
-});
+// Helper to create a JWT-like token
+function signToken(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", SECRET).update(`${header}.${body}`).digest("base64url");
+  return `${header}.${body}.${signature}`;
+}
 
+// Helper to verify the token
+function verifyToken(token) {
+  const [header, body, signature] = token.split(".");
+  const expectedSig = crypto.createHmac("sha256", SECRET).update(`${header}.${body}`).digest("base64url");
+  if (expectedSig !== signature) return null;
+  return JSON.parse(Buffer.from(body, "base64url").toString());
+}
+
+// Health check
+app.get("/", (req, res) => res.send("OK"));
+
+// Discord OAuth callback
 app.get("/oauth/discord/callback", async (req, res) => {
   const code = req.query.code;
-  if (!code) return res.send("No code provided");
+  if (!code) return res.send("Missing code");
 
-  // Step 1: Exchange code for access token
   const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
+    client_id: process.env.CLIENT_ID,
+    client_secret: process.env.CLIENT_SECRET,
     grant_type: "authorization_code",
     code,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: "https://molten-f0o7.onrender.com/oauth/discord/callback",
   });
 
-  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-    method: "POST",
-    body: params,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  });
+  try {
+    // Get access token from Discord
+    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      body: params,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    const data = await tokenRes.json();
+    const accessToken = data.access_token;
 
-  const data = await tokenRes.json();
-  if (!data.access_token) return res.send("Invalid OAuth token");
+    // Get user info
+    const userRes = await fetch("https://discord.com/api/v10/users/@me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const user = await userRes.json();
 
-  // Step 2: Get user info
-  const userRes = await fetch("https://discord.com/api/v10/users/@me", {
-    headers: { Authorization: `Bearer ${data.access_token}` },
-  });
-  const user = await userRes.json();
+    // Get guild membership
+    const memberRes = await fetch(
+      `https://discord.com/api/v10/users/@me/guilds/${SERVER_ID}/member`,
+      { headers: { Authorization: `Bot ${process.env.BOT_TOKEN}` } } // Need a bot token here
+    );
 
-  // Step 3: Use bot to check member roles
-  const memberRes = await fetch(
-    `https://discord.com/api/v10/guilds/${SERVER_ID}/members/${user.id}`,
-    { headers: { Authorization: `Bot ${BOT_TOKEN}` } }
-  );
+    if (!memberRes.ok) return res.send("Access denied: Not in server");
 
-  if (!memberRes.ok) return res.send("Access denied: Not a member");
-  const member = await memberRes.json();
-  if (!member.roles.includes(ROLE_ID))
-    return res.send("Access denied: Missing required role");
+    const member = await memberRes.json();
+    if (!member.roles.includes(ROLE_ID)) return res.send("Access denied: Missing role");
 
-  // Step 4: Generate JWT for your client
-  const token = jwt.sign(
-    { id: user.id, username: user.username },
-    JWT_SECRET,
-    { expiresIn: "1h" }
-  );
+    // Create JWT-like token for client
+    const token = signToken({
+      id: user.id,
+      username: user.username,
+      discriminator: user.discriminator,
+      avatar: user.avatar,
+    });
 
-  // Redirect to your client with token (can be used to authorize features)
-  res.redirect(`https://arras.io/?token=${token}`);
+    // Redirect to arras.io with token
+    res.redirect(`https://arras.io/?token=${token}`);
+  } catch (err) {
+    console.error(err);
+    res.send("Error during authentication");
+  }
 });
 
-// ===== START SERVER =====
+// Optional endpoint to verify token
+app.get("/verify", (req, res) => {
+  const token = req.query.token;
+  const payload = verifyToken(token);
+  if (!payload) return res.send("Invalid token");
+  res.send(`Hello ${payload.username}`);
+});
+
 app.listen(process.env.PORT || 3000, () => console.log("Server running"));
