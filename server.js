@@ -1,5 +1,6 @@
 import express from "express";
 import fetch from "node-fetch";
+import session from "express-session";
 
 const app = express();
 
@@ -8,15 +9,24 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = "https://molten-f0o7.onrender.com/oauth/discord/callback";
 
-// List of allowed Discord usernames
+// Allowed users
 const allowedUsers = [
   "slimefroster#0"
 ];
+
+// Use session to store Discord user data securely
+app.use(session({
+  secret: process.env.SESSION_SECRET || "supersecret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === "production" } // HTTPS only in prod
+}));
 
 app.get("/", (req, res) => {
   res.send("Server running");
 });
 
+// Discord OAuth callback
 app.get("/oauth/discord/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("Missing code");
@@ -44,27 +54,39 @@ app.get("/oauth/discord/callback", async (req, res) => {
     });
     const user = await userRes.json();
 
-    // Check username#discriminator
-    const userTag = `${user.username}#${user.discriminator}`;
-    const allowed = allowedUsers.includes(userTag);
+    // Fix avatar URL
+    const avatarUrl = user.avatar
+      ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+      : "https://i.ibb.co/wZpCg9HX/default-avatar-profile-icon-social-600nw-1677509740-removebg-preview-2.png";
 
-    // Build redirect URL
-    const redirectUrl = new URL("https://arras.io/");
-    redirectUrl.searchParams.set("perms", allowed ? "true" : "false");
-    redirectUrl.searchParams.set(
-      "user",
-      encodeURIComponent(JSON.stringify({
-        username: user.username,
-        discriminator: user.discriminator,
-        avatar: user.avatar
-      }))
-    );
+    // Store user in session
+    req.session.discordUser = {
+      id: user.id,
+      username: user.username,
+      discriminator: user.discriminator,
+      avatar: avatarUrl,
+      allowed: allowedUsers.includes(`${user.username}#${user.discriminator}`)
+    };
 
-    res.redirect(redirectUrl.toString());
+    res.redirect("/game"); // redirect to your game page
   } catch (err) {
     console.error(err);
     res.send("An error occurred");
   }
+});
+
+// Endpoint for client to get user info
+app.get("/api/user", (req, res) => {
+  if (!req.session.discordUser) return res.status(401).json({ error: "Not logged in" });
+  res.json(req.session.discordUser);
+});
+
+// Logout
+app.get("/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.send("Failed to log out");
+    res.redirect("/"); // or wherever you want
+  });
 });
 
 app.listen(process.env.PORT || 3000, () => console.log("Server running"));
