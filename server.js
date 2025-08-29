@@ -10,8 +10,7 @@ const REDIRECT_URI = "https://molten-f0o7.onrender.com/oauth/discord/callback";
 
 // List of Discord user IDs allowed to use your features
 const allowedUsers = [
-  "123456789012345678", // replace with actual Discord IDs
-  "987654321098765432"
+  "1000323679512711168"
 ];
 
 app.get("/", (req, res) => {
