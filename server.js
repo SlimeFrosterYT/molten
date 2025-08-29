@@ -40,23 +40,21 @@ app.get("/oauth/discord/callback", async (req, res) => {
 
     const avatarUrl = user.avatar
       ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
-      : "https://i.ibb.co/wZpCg9HX/default-avatar-profile-icon-social-600nw-1677509740-removebg-preview-2.png";
+      : "https://i.ibb.co/wZpCg9HX/default-avatar-profile-icon.png";
 
-    const payload = {
+    const discordUser = {
       id: user.id,
       username: user.username,
       discriminator: user.discriminator,
-      avatar: avatarUrl,
+      avatar: avatarUrl
     };
 
-    const randomKey =
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15);
-
-    res.redirect(
-      `/game?${randomKey}=${encodeURIComponent(JSON.stringify(payload))}`
-    );
+    res.send(`
+      <script>
+        localStorage.setItem("discordUser", '${JSON.stringify(discordUser)}');
+        window.location.href = "/game";
+      </script>
+    `);
   } catch (err) {
     console.error(err);
     res.send("An error occurred");
