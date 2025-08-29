@@ -8,9 +8,9 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = "https://molten-f0o7.onrender.com/oauth/discord/callback";
 
-// List of Discord user IDs allowed to use your features
+// List of allowed Discord usernames
 const allowedUsers = [
-  "1000323679512711168"
+  "slimefroster"
 ];
 
 app.get("/", (req, res) => {
@@ -29,27 +29,42 @@ app.get("/oauth/discord/callback", async (req, res) => {
     redirect_uri: REDIRECT_URI,
   });
 
-  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-    method: "POST",
-    body: params,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  });
-  const data = await tokenRes.json();
+  try {
+    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      body: params,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    const data = await tokenRes.json();
 
-  if (!data.access_token) return res.send("Failed to get access token");
+    if (!data.access_token) return res.send("Failed to get access token");
 
-  const userRes = await fetch("https://discord.com/api/v10/users/@me", {
-    headers: { Authorization: `Bearer ${data.access_token}` },
-  });
-  const user = await userRes.json();
+    const userRes = await fetch("https://discord.com/api/v10/users/@me", {
+      headers: { Authorization: `Bearer ${data.access_token}` },
+    });
+    const user = await userRes.json();
 
-  const allowed = allowedUsers.includes(user.id);
+    // Check username#discriminator
+    const userTag = `${user.username}#${user.discriminator}`;
+    const allowed = allowedUsers.includes(userTag);
 
-  // Redirect to client with permission info
-  const redirectUrl = `https://arras.io/?perms=${allowed}&user=${encodeURIComponent(
-    JSON.stringify({ id: user.id, username: user.username })
-  )}`;
-  res.redirect(redirectUrl);
+    // Build redirect URL
+    const redirectUrl = new URL("https://arras.io/");
+    redirectUrl.searchParams.set("perms", allowed ? "true" : "false");
+    redirectUrl.searchParams.set(
+      "user",
+      encodeURIComponent(JSON.stringify({
+        username: user.username,
+        discriminator: user.discriminator,
+        avatar: user.avatar
+      }))
+    );
+
+    res.redirect(redirectUrl.toString());
+  } catch (err) {
+    console.error(err);
+    res.send("An error occurred");
+  }
 });
 
 app.listen(process.env.PORT || 3000, () => console.log("Server running"));
