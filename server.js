@@ -10,8 +10,7 @@ const REDIRECT_URI = "https://molten-f0o7.onrender.com/oauth/discord/callback";
 
 // List of allowed Discord usernames
 const allowedUsers = [
-  "SomeUser#1234",
-  "AnotherUser#5678"
+  "slimefroster#0"
 ];
 
 app.get("/", (req, res) => {
