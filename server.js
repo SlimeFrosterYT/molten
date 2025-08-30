@@ -14,14 +14,6 @@ app.get("/", (req, res) => {
   res.send("Server running");
 });
 
-app.get('/scrollbox-data', (req, res) => {
-    const user = req.user; // assume you get user from session/auth
-    if (!user || !user.allowed) {
-        return res.status(403).json({ error: 'No permission' });
-    }
-    res.json({ items: getScrollboxItems() }); // only allowed users get this
-});
-
 app.get("/oauth/discord/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("Missing code");
