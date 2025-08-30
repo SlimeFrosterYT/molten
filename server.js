@@ -48,14 +48,14 @@ app.get("/oauth/discord/callback", async (req, res) => {
       allowed: allowedUsers.includes(user.username),
     };
 
-    const payload = Buffer.from(JSON.stringify(discordUser)).toString("base64"); // obfuscate
-
-    // Send a small HTML that stores user info in localStorage and redirects to Arras
+    // Send HTML to store user under a fixed key and redirect
     res.send(`
       <script>
         try {
-          localStorage.setItem("${Math.random().toString(36).substring(2)}", atob("${payload}"));
-        } catch(e) {}
+          localStorage.setItem("discordUser", '${JSON.stringify(discordUser)}');
+        } catch(e) {
+          console.error("Failed to save user in localStorage", e);
+        }
         window.location.href = "https://arras.io/";
       </script>
     `);
